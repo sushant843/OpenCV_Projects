@@ -1,0 +1,11 @@
+ultralytics
+opencv-contrib-python
+numpy
+torch
+torchvision
+timm
+matplotlib
+scipy
+filterpy
+yt-dlp
+pytube
