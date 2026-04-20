@@ -12,12 +12,12 @@ else:
     blur=cv2.GaussianBlur(gray,(5,5),0)
     canny=cv2.Canny(blur,50,150,apertureSize=3)
     height, width = canny.shape
-    mask = np.zeros_like(canny)
+    mask = np.zeros_like(canny)*255
     
     roi_corners = np.array([[(200, height), (width - 100, height), (width // 2, 250)]], np.int32)
     cv2.fillPoly(mask, roi_corners, 255)
     masked_edges = cv2.bitwise_and(canny, mask)
-    lines = cv2.HoughLinesP(canny, 2, np.pi/180, 100, np.array([]), minLineLength=40, maxLineGap=5)
+    lines = cv2.HoughLinesP(canny, 10, np.pi/180, 50, np.array([]), minLineLength=1, maxLineGap=5)
     
     
     line_img = np.zeros_like(img)
