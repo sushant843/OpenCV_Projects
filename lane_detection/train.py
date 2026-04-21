@@ -8,7 +8,13 @@ from torch.utils.data import Dataset, DataLoader
 # =========================
 # CONFIG
 # =========================
-DATASET_PATH = r"\lane_detection\data\tusimple_preprocessed"
+DATASET_PATH = "lane_detection/data/tusimple_preprocessed"
+
+# 1. Gets the exact folder where train.py lives (lane_detection)
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# # 2. Joins that securely to the rest of your path
+# DATASET_PATH = os.path.join(BASE_DIR, "data", "tusimple_preprocessed","training")
 IMG_HEIGHT = 256
 IMG_WIDTH = 512
 BATCH_SIZE = 4
@@ -20,47 +26,58 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 # =========================
 class LaneDataset(Dataset):
     def __init__(self, root_dir):
-        self.img_dir = os.path.join(root_dir, "training", "frames")
-        self.mask_dir = os.path.join(root_dir, "training", "lane_masks")
-        self.imgs = os.listdir(self.img_dir)
+        self.img_dir = os.path.join(root_dir, "frames")
+        self.mask_dir = os.path.join(root_dir, "lane-masks")
+
+        # --- DEBUGGING PRINTS ---
+        print(f"Checking Path: {self.img_dir}")
+        if not os.path.exists(self.img_dir):
+            print(f"ERROR: The folder '{self.img_dir}' does not exist!")
+            self.valid_imgs = []
+            return
+
+        all_files = os.listdir(self.img_dir)
+        print(f"Found {len(all_files)} total files in frames folder.")
+        
+        self.valid_imgs = []
+        for f in all_files:
+            if f.lower().endswith(".jpg"):
+                # Check for the mask. 
+                # IMPORTANT: Ensure your masks are actually .png
+                mask_name = f.replace(".jpg", ".png")
+                mask_path = os.path.join(self.mask_dir, mask_name)
+                
+                if os.path.exists(mask_path):
+                    self.valid_imgs.append(f)
+        
+        if len(self.valid_imgs) == 0:
+            print("ERROR: Found 0 pairs. Check if masks have the same name as images!")
+            # Print one sample to see what's happening
+            if len(all_files) > 0:
+                print(f"Sample frame name: {all_files[0]}")
+                print(f"Expected mask path: {os.path.join(self.mask_dir, all_files[0].replace('.jpg', '.png'))}")
+        else:
+            print(f"Successfully matched {len(self.valid_imgs)} image-mask pairs.")
 
     def __len__(self):
-        return len(self.imgs)
+        return len(self.valid_imgs)
 
     def __getitem__(self, idx):
-        img_name = self.imgs[idx]
-
+        img_name = self.valid_imgs[idx]
         img_path = os.path.join(self.img_dir, img_name)
-
-        # handle different extensions safely
-        name = os.path.splitext(img_name)[0]
-        possible_masks = [
-            name + ".png",
-            name + ".jpg",
-            name + "_mask.png"
-        ]
-
-        mask = None
-        for m in possible_masks:
-            path = os.path.join(self.mask_dir, m)
-            if os.path.exists(path):
-                mask = cv2.imread(path, 0)
-                break
+        mask_path = os.path.join(self.mask_dir, img_name.replace(".jpg", ".png"))
 
         img = cv2.imread(img_path)
+        mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
 
-        if img is None or mask is None:
-            raise FileNotFoundError(f"Missing file: {img_name}")
-
-        # resize
         img = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
         mask = cv2.resize(mask, (IMG_WIDTH, IMG_HEIGHT))
 
-        # normalize
+        # Normalize
         img = img / 255.0
         mask = mask / 255.0
 
-        img = torch.tensor(img).permute(2,0,1).float()
+        img = torch.tensor(img).permute(2, 0, 1).float()
         mask = torch.tensor(mask).unsqueeze(0).float()
 
         return img, mask
